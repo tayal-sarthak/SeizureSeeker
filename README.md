@@ -98,4 +98,15 @@ To embed Seizure Seeker into another web project:
 ```html
 <iframe src="seizure_detector.html" style="border:none;width:100%;height:700px"></iframe>
 ```
-... (12 lines left)
+
+---
+
+## 📄 License
+
+Seizure Seeker is distributed under the MIT License. See the [LICENSE](LICENSE) file for full details.
+
+---
+
+## 🙌 Credits
+
+- Built using [`jsEDF`](https://github.com/Neurobotics/jsEDF) and [`PapaParse`](https://www.papaparse.com)
