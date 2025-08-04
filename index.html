@@ -12,21 +12,58 @@
     <!-- CYBER-NEON DARK THEME -->
     <style>
       :root {
-        --bg:#060607; --card:#12091e; --purple:#6b21a8; --green:#16a34a; --text:#e5e7eb; --muted:#9ca3af; --rad:1rem;
+        --bg:#060607; --card:#12091e; --purple:#6b21a8; --green:#16a34a;
+        --text:#e5e7eb; --muted:#9ca3af;
       }
-      *{box-sizing:border-box} html,body{margin:0;padding:0}
-      body{font-family:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;background:var(--bg);color:var(--text);line-height:1.6;padding:2rem 1rem 4rem;min-height:100vh;background-image:radial-gradient(circle at 25% 15%,rgba(107,33,168,.25) 0%,transparent 40%),radial-gradient(circle at 75% 85%,rgba(22,163,74,.15) 0%,transparent 45%);background-repeat:no-repeat}
-      h1{text-align:center;font-size:2rem;font-weight:800;color:var(--green);text-shadow:0 0 8px rgba(22,163,74,.7);margin-bottom:1.5rem}
-      .card{background:var(--card);border:1px solid rgba(255,255,255,.05);border-radius:var(--rad);padding:1.75rem 1.5rem;box-shadow:0 8px 24px rgba(0,0,0,.5);margin:0 auto 2rem;max-width:720px}
+      *{box-sizing:border-box}
+      html,body{margin:0;padding:0}
+      body{
+        font-family:"Inter",ui-sans-serif,system-ui;
+        background:var(--bg);color:var(--text);line-height:1.6;
+        padding:2rem 1rem 4rem;min-height:100vh;
+        background-image:
+          radial-gradient(circle at 25% 15%,rgba(107,33,168,.25) 0%,transparent 40%),
+          radial-gradient(circle at 75% 85%,rgba(22,163,74,.15) 0%,transparent 45%);
+        background-repeat:no-repeat
+      }
+      h1{
+        text-align:center;font-size:2rem;font-weight:800;
+        color:var(--green);text-shadow:0 0 8px rgba(22,163,74,.7);
+        margin-bottom:1.5rem
+      }
+      .card{
+        background:var(--card);border:1px solid rgba(255,255,255,.05);
+        border-radius:1rem;padding:1.75rem 1.5rem;
+        box-shadow:0 8px 24px rgba(0,0,0,.5);
+        margin:0 auto 2rem;max-width:720px
+      }
       label{font-weight:600;color:var(--muted)}
-      input[type=file],input[type=number]{margin-left:.5rem;padding:.35rem .5rem;background:#09090b;border:1px solid rgba(255,255,255,.1);border-radius:.375rem;color:var(--text)}
-      button{background:linear-gradient(135deg,var(--purple),var(--green));border:none;color:#fff;padding:.6rem 1.2rem;font-weight:700;border-radius:.5rem;cursor:pointer;transition:transform .15s,box-shadow .15s}
+      input[type=file],input[type=number]{
+        margin-left:.5rem;padding:.35rem .5rem;background:#09090b;
+        border:1px solid rgba(255,255,255,.1);border-radius:.375rem;
+        color:var(--text)
+      }
+      button{
+        background:linear-gradient(135deg,var(--purple),var(--green));
+        border:none;color:#fff;padding:.6rem 1.2rem;font-weight:700;
+        border-radius:.5rem;cursor:pointer;
+        transition:transform .15s,box-shadow .15s
+      }
       button:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.4)}
-      fieldset{border:none;padding:0;margin:0;display:flex;flex-wrap:wrap;gap:2rem;align-items:center}
+      fieldset{border:none;margin:0;padding:0;
+        display:flex;flex-wrap:wrap;gap:2rem;align-items:center}
       table{width:100%;border-collapse:collapse;margin-top:1rem}
-      th,td{padding:.5rem .75rem;text-align:left;border-bottom:1px solid rgba(255,255,255,.08)} th{color:var(--green);font-weight:700}
-      .error{color:#f87171;font-weight:600}.hidden{display:none}#status{margin-left:1rem;font-weight:600;color:var(--purple)}
-      footer{text-align:center;margin-top:3rem;color:var(--muted);font-size:.875rem} footer strong{color:var(--green)}
+      th,td{
+        padding:.5rem .75rem;text-align:left;
+        border-bottom:1px solid rgba(255,255,255,.08)
+      }
+      th{color:var(--green);font-weight:700}
+      .error{color:#f87171;font-weight:600}
+      .hidden{display:none}
+      #status{margin-left:1rem;font-weight:600;color:var(--purple)}
+      footer{text-align:center;margin-top:3rem;
+        color:var(--muted);font-size:.875rem}
+      footer strong{color:var(--green)}
     </style>
   </head>
   <body>
@@ -34,55 +71,223 @@
 
     <!-- CONTROLS -->
     <div class="card">
-      <p style="margin-bottom:1rem">Upload an <strong>.edf</strong> (EDF/EDF+) or <strong>.csv</strong> EEG file and click <em>Analyze</em>.<br><span style="color:var(--green);font-weight:600">Overlapping-RMS + gap-merging</span> finds seizure-like segments.</p>
+      <p>
+        Upload an <strong>.edf</strong> (EDF/EDF+) or <strong>.csv</strong> EEG file and click
+        <em>Analyze</em>.<br>
+        <span style="color:var(--green);font-weight:600">
+          Overlapping-RMS + gap-merging
+        </span>
+        finds seizure-like segments.
+      </p>
+
       <input id="fileInput" type="file" accept=".edf,.csv" />
       <br><br>
+
       <fieldset>
-        <div><label>Z-score&nbsp;threshold <input id="zThresh" type="number" step="0.1" value="5" style="width:5rem"/></label></div>
-        <div><label>Min&nbsp;duration&nbsp;(s) <input id="minDur" type="number" step="1" value="15" style="width:5rem"/></label></div>
-        <div id="csvFsWrap" class="hidden"><label>Sampling&nbsp;rate&nbsp;(Hz) <input id="csvFs" type="number" step="1" value="256" style="width:6rem"/></label></div>
+        <label>
+          Z-score threshold
+          <input id="zThresh" type="number" step="0.1" value="5" style="width:5rem">
+        </label>
+        <label>
+          Min duration&nbsp;(s)
+          <input id="minDur" type="number" step="1" value="15" style="width:5rem">
+        </label>
+        <label id="csvFsWrap" class="hidden">
+          Sampling rate&nbsp;(Hz)
+          <input id="csvFs" type="number" step="1" value="256" style="width:6rem">
+        </label>
       </fieldset>
+
       <br>
       <button id="analyzeBtn">Analyze</button><span id="status"></span>
     </div>
 
     <!-- RESULTS -->
     <div id="results" class="card hidden">
-      <h2 style="font-size:1.25rem;font-weight:700;color:var(--purple);text-shadow:0 0 6px rgba(107,33,168,.6)">Detected segments</h2>
-      <table><thead><tr><th>#</th><th>Start (s)</th><th>End (s)</th><th>Duration (s)</th></tr></thead><tbody id="resultBody"></tbody></table>
+      <h2 style="font-size:1.25rem;font-weight:700;
+                 color:var(--purple);text-shadow:0 0 6px rgba(107,33,168,.6)">
+        Detected segments
+      </h2>
+      <table>
+        <thead>
+          <tr><th>#</th><th>Start&nbsp;(s)</th><th>End&nbsp;(s)</th><th>Duration&nbsp;(s)</th></tr>
+        </thead>
+        <tbody id="resultBody"></tbody>
+      </table>
     </div>
 
     <!-- HOW IT WORKS -->
     <div class="card" id="about">
-      <h2 style="font-size:1.25rem;font-weight:700;color:var(--green);text-shadow:0 0 6px rgba(22,163,74,.6)">How this detector works</h2>
+      <h2 style="font-size:1.25rem;font-weight:700;
+                 color:var(--green);text-shadow:0 0 6px rgba(22,163,74,.6)">
+        How this detector works
+      </h2>
       <ul style="margin-left:1rem">
-        <li>Signal is windowed into 1-s RMS frames with 50 % overlap.</li>
-        <li>Baseline = median + MAD of first 5 min (or 10 % of file).</li>
-        <li>Frames above <code>median + z x MAD</code> are flagged.</li>
-        <li>Adjacent hits with gaps ≤ 5 s are merged.</li>
-        <li>Segments shorter than <strong>15 s</strong> are discarded.</li>
+        <li>Signal is windowed into 1-s RMS frames with 50&nbsp;% overlap.</li>
+        <li>Baseline = median + MAD of the <strong>quietest 50&nbsp;%</strong> of RMS frames.</li>
+        <li>Frames above <code>median + z × MAD</code> are flagged.</li>
+        <li>Adjacent hits with gaps ≤ 5&nbsp;s are merged.</li>
+        <li>Segments shorter than <strong>15&nbsp;s</strong> are discarded.</li>
       </ul>
-      <p>You can adjust the Z-score or sampling-rate fields to suit your data. The "Detections" table updates instantly after processing.</p>
     </div>
 
     <footer>
-      <p>☝️ <strong>Please read the entire page and verify your file</strong> before trusting these results.<br>By uploading, you confirm you have reviewed the guidelines above in full.</p>
+      <p>☝️ <strong>Please read the entire page and verify your file</strong>
+         before trusting these results.</p>
     </footer>
 
     <!-- CORE SCRIPT -->
     <script>
-      const fileInput=document.getElementById('fileInput');
-      const csvFsWrap=document.getElementById('csvFsWrap');
-      const statusEl=document.getElementById('status');
-      const resultCard=document.getElementById('results');
-      const tbody=document.getElementById('resultBody');
-      let file=null;
-      fileInput.addEventListener('change',e=>{file=e.target.files[0]||null;if(!file)return;statusEl.textContent=`Loaded: ${file.name}`;resultCard.classList.add('hidden');csvFsWrap.classList.toggle('hidden',!file.name.toLowerCase().endsWith('.csv'));});
-      document.getElementById('analyzeBtn').addEventListener('click',()=>{if(!file){alert('Pick a file first.');return;}const z=+document.getElementById('zThresh').value;const md=+document.getElementById('minDur').value;const ext=file.name.split('.').pop().toLowerCase();ext==='csv'?handleCsv(z,md):handleEdf(z,md);});
-      function detect(signal,fs,z=5,minDur=15,mergeGap=5){const win=Math.round(fs),hop=Math.round(fs/2),nWin=Math.floor((signal.length-win)/hop)+1,rms=new Float64Array(nWin);for(let i=0;i<nWin;i++){let sum=0;for(let j=0;j<win;j++){const v=signal[i*hop+j];sum+=v*v;}rms[i]=Math.sqrt(sum/win);}const baseWins=Math.min(Math.floor(300/(hop/fs)),Math.floor(nWin*0.1)),base=rms.slice(0,baseWins),sorted=Array.from(base).sort((a,b)=>a-b),median=sorted[Math.floor(sorted.length/2)],mad=base.reduce((a,v)=>a+Math.abs(v-median),0)/base.length,thr=median+z*mad;const segs=[];let start=null;for(let i=0;i<nWin;i++){if(rms[i]>thr){if(start===null)start=i;}else if(start!==null){const d=(i-start)*hop/fs;if(d>=minDur)segs.push({start:start*hop/fs,end:(i*hop+win)/fs});start=null;}}if(start!==null){const d=(nWin-start)*hop/fs;if(d>=minDur)segs.push({start:start*hop/fs,end:((nWin-1)*hop+win)/fs});}if(!segs.length)return[];segs.sort((a,b)=>a.start-b.start);const merged=[segs[0]];for(let i=1;i<segs.length;i++){const last=merged[merged.length-1];if(segs[i].start-last.end<=mergeGap){last.end=Math.max(last.end,segs[i].end);}else{merged.push({...segs[i]});}}return merged.filter(s=>s.end-s.start>=minDur);} 
-      function populate(segs){tbody.innerHTML='';segs.forEach((s,i)=>{const tr=document.createElement('tr');[i+1,s.start.toFixed(2),s.end.toFixed(2),(s.end-s.start).toFixed(2)].forEach(t=>{const td=document.createElement('td');td.textContent=t;tr.appendChild(td);});tbody.appendChild(tr);});statusEl.textContent=segs.length?`Detected ${segs.length} segment${segs.length>1?'s':''}`:'No segments found.';resultCard.classList.toggle('hidden',!segs.length);} 
-      function handleCsv(z,md){const fs=+document.getElementById('csvFs').value||256;statusEl.textContent='Parsing CSV…';Papa.parse(file,{dynamicTyping:true,header:true,skipEmptyLines:true,complete:res=>{if(!res.data.length){statusEl.textContent='CSV looks empty.';return;}const keys=Object.keys(res.data[0]).filter(k=>typeof res.data[0][k]==='number');if(!keys.length){statusEl.textContent='No numeric columns.';return;}const sig=res.data.map(r=>keys.reduce((s,k)=>s+(r[k]||0),0)/keys.length);populate(detect(sig,fs,z,md));}});} 
-      function handleEdf(z,md){if(typeof EDF==='undefined'){statusEl.innerHTML='<span class="error">EDF lib failed to load.</span>';return;}statusEl.textContent='Reading EDF…';const reader=new FileReader();reader.onload=e=>{try{const edf=new EDF(new Uint8Array(e.target.result));const dur=edf.duration;const sig=edf.readSingleChannel(0,0,dur);const fs=sig.length/dur;populate(detect(sig,fs,z,md));}catch(err){console.error(err);statusEl.innerHTML=`<span class="error">EDF parse error: ${err.message||err}</span>`;}};reader.readAsArrayBuffer(file);} 
+      const fileInput  = document.getElementById('fileInput');
+      const csvFsWrap  = document.getElementById('csvFsWrap');
+      const statusEl   = document.getElementById('status');
+      const resultCard = document.getElementById('results');
+      const tbody      = document.getElementById('resultBody');
+
+      let file = null;
+
+      fileInput.addEventListener('change', e => {
+        file = e.target.files[0] || null;
+        if (!file) return;
+        statusEl.textContent = `Loaded: ${file.name}`;
+        resultCard.classList.add('hidden');
+        csvFsWrap.classList.toggle(
+          'hidden',
+          !file.name.toLowerCase().endsWith('.csv')
+        );
+      });
+
+      document.getElementById('analyzeBtn')
+        .addEventListener('click', () => {
+          if (!file) { alert('Pick a file first.'); return; }
+          const z  = +document.getElementById('zThresh').value;
+          const md = +document.getElementById('minDur').value;
+          const ext = file.name.split('.').pop().toLowerCase();
+          ext === 'csv' ? handleCsv(z, md) : handleEdf(z, md);
+        });
+
+      /* ---------- Detection with quietest-50 % baseline ---------- */
+      function detect(signal, fs, z = 5, minDur = 15, mergeGap = 5) {
+        const win = Math.round(fs);          // 1-s window
+        const hop = Math.round(fs / 2);      // 50 % overlap
+        const n   = Math.floor((signal.length - win) / hop) + 1;
+
+        // RMS per window
+        const rms = new Float64Array(n);
+        for (let i = 0; i < n; i++) {
+          let sum = 0;
+          for (let j = 0; j < win; j++) {
+            const v = signal[i * hop + j];
+            sum += v * v;
+          }
+          rms[i] = Math.sqrt(sum / win);
+        }
+
+        // Baseline from lowest-energy half
+        const sorted = Array.from(rms).sort((a, b) => a - b);
+        const quiet  = sorted.slice(0, Math.floor(sorted.length * 0.5));
+        const median = quiet[Math.floor(quiet.length / 2)];
+        const mad    = quiet.reduce((acc, v) => acc + Math.abs(v - median), 0) /
+                       quiet.length;
+        const thr = median + z * mad;
+
+        // Flag windows
+        const segs = [];
+        let start = null;
+        for (let i = 0; i < n; i++) {
+          if (rms[i] > thr) {
+            if (start === null) start = i;
+          } else if (start !== null) {
+            const dur = (i - start) * hop / fs;
+            if (dur >= minDur)
+              segs.push({ start: start * hop / fs,
+                          end:   (i * hop + win) / fs });
+            start = null;
+          }
+        }
+        if (start !== null) {
+          const dur = (n - start) * hop / fs;
+          if (dur >= minDur)
+            segs.push({ start: start * hop / fs,
+                        end:   ((n - 1) * hop + win) / fs });
+        }
+
+        // Merge close detections
+        if (!segs.length) return [];
+        segs.sort((a, b) => a.start - b.start);
+        const merged = [segs[0]];
+        for (let i = 1; i < segs.length; i++) {
+          const last = merged[merged.length - 1];
+          if (segs[i].start - last.end <= mergeGap) {
+            last.end = Math.max(last.end, segs[i].end);
+          } else {
+            merged.push({ ...segs[i] });
+          }
+        }
+        return merged.filter(s => (s.end - s.start) >= minDur);
+      }
+
+      /* ---------- Helpers ---------- */
+      function populate(segs) {
+        tbody.innerHTML = '';
+        segs.forEach((s, i) => {
+          const tr = document.createElement('tr');
+          [i + 1, s.start.toFixed(2), s.end.toFixed(2),
+           (s.end - s.start).toFixed(2)]
+            .forEach(t => {
+              const td = document.createElement('td');
+              td.textContent = t;
+              tr.appendChild(td);
+            });
+          tbody.appendChild(tr);
+        });
+        statusEl.textContent = segs.length
+          ? `Detected ${segs.length} segment${segs.length > 1 ? 's' : ''}`
+          : 'No segments found.';
+        resultCard.classList.toggle('hidden', !segs.length);
+      }
+
+      function handleCsv(z, md) {
+        const fs = +document.getElementById('csvFs').value || 256;
+        statusEl.textContent = 'Parsing CSV…';
+        Papa.parse(file, {
+          dynamicTyping: true,
+          header: true,
+          skipEmptyLines: true,
+          complete: res => {
+            if (!res.data.length) { statusEl.textContent = 'CSV looks empty.'; return; }
+            const keys = Object.keys(res.data[0])
+                           .filter(k => typeof res.data[0][k] === 'number');
+            if (!keys.length) { statusEl.textContent = 'No numeric columns.'; return; }
+            const sig = res.data.map(r =>
+              keys.reduce((s, k) => s + (r[k] || 0), 0) / keys.length);
+            populate(detect(sig, fs, z, md));
+          }
+        });
+      }
+
+      function handleEdf(z, md) {
+        if (typeof EDF === 'undefined') {
+          statusEl.innerHTML = '<span class="error">EDF lib failed to load.</span>';
+          return;
+        }
+        statusEl.textContent = 'Reading EDF…';
+        const reader = new FileReader();
+        reader.onload = e => {
+          try {
+            const edf = new EDF(new Uint8Array(e.target.result));
+            const dur = edf.duration;
+            const sig = edf.readSingleChannel(0, 0, dur);
+            const fs  = sig.length / dur;
+            populate(detect(sig, fs, z, md));
+          } catch (err) {
+            console.error(err);
+            statusEl.innerHTML =
+              `<span class="error">EDF parse error: ${err.message || err}</span>`;
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      }
     </script>
   </body>
 </html>

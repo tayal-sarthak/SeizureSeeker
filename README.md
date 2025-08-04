@@ -1,112 +1,81 @@
-<p align="center">
-  <br>
-  <img src="https://raw.githubusercontent.com/your-org/seizure-seeker/main/docs/assets/seizure_seeker_logo.png" width="160" alt="Seizure Seeker logo"/>
-  <br>
-</p>
-<div align="center">
+# Seizure Seeker
 
-[![GitHub release](https://img.shields.io/github/v/release/your-org/seizure-seeker?logo=github)](https://github.com/your-org/seizure-seeker/releases)
-[![License](https://img.shields.io/github/license/your-org/seizure-seeker)](LICENSE)
-[![Issues](https://img.shields.io/github/issues/your-org/seizure-seeker)](https://github.com/your-org/seizure-seeker/issues)
-[![Last commit](https://img.shields.io/github/last-commit/your-org/seizure-seeker)](https://github.com/your-org/seizure-seeker/commits/main)
+Seizure Seeker is a browser-based EEG seizure-like event detector that runs entirely client-side. It processes `.edf` (European Data Format) and `.csv` EEG files, computes signal energy, and identifies candidate seizure segments using overlapping RMS windows and robust statistics.
 
-</div>
+## Features
 
-# Seizure Seeker ⚡
+- **Input formats**: EDF/EDF+ and CSV
+- **Real-time processing**: All computations occur in your browser—no server required
+- **Robust baseline estimation**: Uses median + MAD of the quietest 50% of frames
+- **Adjustable parameters**:
+  - **Z-score threshold**: Number of MADs above median to flag (default `5`)
+  - **Minimum duration**: Minimum segment length in seconds (default `15`)
+  - **Merge gap**: Max gap to merge segments (fixed at `5` seconds)
+- **Instant results**: Detected segment start/end times displayed in seconds
+- **Privacy-first**: EEG data never leaves your computer
 
-Seizure Seeker is a browser-based application that detects seizure-like events in EEG data provided as `.edf` or `.csv` files. The detection process runs entirely on the client side, ensuring that no data is transmitted externally.
+## Installation
 
----
+1. **Clone the repository**  
+   ```bash
+   git clone https://github.com/yourusername/seizure-seeker.git
+   cd seizure-seeker
+   ```
 
-## 📌 Features
+2. **Serve the files**  
+   You can use any static file server:
+   ```bash
+   # Using Node.js 'serve'
+   npx serve .
 
-- Local-only RMS-based seizure detector (no server, no dependencies)
-- Accepts EDF, EDF+ and numeric CSV files
-- Adjustable threshold, minimum duration, and sampling rate (for CSV)
-- Results rendered in a dynamic HTML table
-- No installation required – runs in Chrome, Firefox, Edge
-- Fully responsive, dark-themed UI with accent colors
+   # Or Python's built-in HTTP server
+   python3 -m http.server 8000
+   ```
 
----
+3. **Open in browser**  
+   Navigate to `http://localhost:8000` (or your chosen port) and load an EEG file.
 
-## 🚀 Quick Start
+## Usage
 
-```bash
-# Clone the repo
-$ git clone https://github.com/your-org/seizure-seeker.git
-$ cd seizure-seeker
+1. Click **Choose File** and select an `.edf` or `.csv` EEG file.  
+2. (For CSV files) Enter the sampling rate (Hz) in the **Sampling rate** field.  
+3. Adjust **Z-score threshold** and **Min duration** as needed.  
+4. Click **Analyze** to detect seizure-like segments.  
+5. View the results table for segment start/end times and durations.
 
-# Open the tool
-$ open seizure_detector.html  # or double-click to open in your browser
-```
+## Algorithm
 
-Once opened:
-1. Click **Choose file** and select an `.edf` or `.csv` file
-2. Set the z-score threshold and minimum duration if needed
-3. Click **Analyze** to see detected seizure segments
+Seizure Seeker implements a simple, fast amplitude-based detection:
 
----
+1. **Windowing**  
+   Slide a **1-second** window with **50% overlap** over the EEG signal.
+2. **RMS Energy**  
+   Compute the root-mean-square (RMS) energy of each window to estimate signal power.
+3. **Baseline estimation**  
+   Sort all RMS values, take the **quietest 50%**, and compute their **median** and **MAD** (mean absolute deviation).
+4. **Thresholding**  
+   Flag frames where  
+   ```
+   RMS > median + z * MAD
+   ```  
+   (`z` is the Z-score threshold).
+5. **Segmentation**  
+   Group consecutive flagged frames into segments.
+6. **Duration filtering**  
+   Discard segments shorter than the **minimum duration** (`minDur`).
+7. **Merging**  
+   Merge segments separated by gaps ≤ **5 seconds**, then re-apply the minimum duration filter.
+8. **Output**  
+   Report segment start/end times (in seconds) for review.
 
-## 🧠 How It Works
+## Configuration
 
-1. Signal is windowed into 1-second RMS frames with 50% overlap
-2. A baseline is computed using `median + MAD` from the first 5 minutes or 10% of the file
-3. Frames exceeding `baseline + (z × MAD)` are flagged
-4. Neighboring flagged regions within 5 seconds are merged
-5. Segments shorter than the minimum duration (default 15 seconds) are discarded
+All parameters can be tweaked directly in the UI. To customize core behavior (e.g., window size, overlap, merge gap), edit the `detect()` function in `index.html`.
 
----
+## Contributing
 
-## 📂 File Format Guidelines
+Contributions are welcome! Please open issues or submit pull requests for enhancements, bug fixes, or new features.
 
-### EDF
-- Regular EDF or EDF+ (16-bit little-endian)
-- Only the first channel is used (by default)
+## License
 
-### CSV
-- Header row must be present
-- Only numeric columns are considered
-- Sampling rate must be set manually in the UI
-
----
-
-## ⚙️ Customization
-
-Modify `seizure_detector.html` directly. Example:
-
-```js
-// Change merge gap or use multi-channel logic
-const mergeGap = 5; // seconds
-```
-
-To enable multi-channel voting or apply filters, adapt the signal processing section before the `detect()` call.
-
----
-
-## ❗ Limitations
-
-- Single-channel processing may miss focal events
-- Muscle/motion artifacts can create false positives
-- Browser memory usage scales with file duration
-
----
-
-## 📦 Embedding
-
-To embed Seizure Seeker into another web project:
-
-```html
-<iframe src="seizure_detector.html" style="border:none;width:100%;height:700px"></iframe>
-```
-
----
-
-## 📄 License
-
-Seizure Seeker is distributed under the MIT License. See the [LICENSE](LICENSE) file for full details.
-
----
-
-## 🙌 Credits
-
-- Built using [`jsEDF`](https://github.com/Neurobotics/jsEDF) and [`PapaParse`](https://www.papaparse.com)
+MIT License. See [LICENSE](LICENSE) for details.
