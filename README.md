@@ -173,10 +173,10 @@ Edit the `detect()` function in `index.html` to modify:
 
 ## License
 
-MIT License © 2025 Your Name
+MIT License © 2025
 
 ---
 
 ## Contact
 
-For questions or feedback, contact [youremail@example.com].
+For questions or feedback, contact [sarthaktayal2@gmail.com].
