@@ -91,7 +91,7 @@ Open <http://localhost:8000> in your browser.
 ## Algorithm Details
 
 **1. Windowing**  
-- 1 s RMS frames with 50% overlap.
+- 1 s RMS frames with 50% overlap
 
 **2. RMS Energy**  
 \`\`\`  
