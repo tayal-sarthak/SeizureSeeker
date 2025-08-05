@@ -75,7 +75,7 @@ Once opened:
 Modify `seizure_detector.html` directly. Example:
 
 ```js
-// Change merge gap or use multi-channel logic
+// Change mrge gap or use multi-channel logic
 const mergeGap = 5; // seconds
 ```
 
