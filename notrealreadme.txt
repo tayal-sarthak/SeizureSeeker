@@ -85,7 +85,7 @@ To enable multi-channel voting or apply filters, adapt the signal processing sec
 
 ## ❗ Limitations
 
-- Single-channel processing may miss focal events
+- Single-channel processing can miss focal events
 - Muscle/motion artifacts can create false positives
 - Browser memory usage scales with file duration
 
