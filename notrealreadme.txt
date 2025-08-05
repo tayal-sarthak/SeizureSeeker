@@ -103,7 +103,7 @@ To embed Seizure Seeker into another web project:
 
 ## 📄 License
 
-Seizure Seeker is distributed under the MIT License. See the [LICENSE](LICENSE) file for full details.
+Seizure Seeker is distributed under the . See the [LICENSE](LICENSE) file for full details.
 
 ---
 
