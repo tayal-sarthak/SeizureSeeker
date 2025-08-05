@@ -1,6 +1,6 @@
 # Seizure Seeker
 
-Seizure Seizure is a browser-based EEG seizure-like event detector that runs entirely client-side. It processes `.edf` (European Data Format) and `.csv` EEG files, computes signal energy using overlapping RMS windows, and identifies candidate seizure segments via robust statistics.
+Seizure Seizure is a browser-based EEG seizure-like event detector that runs entirely client-side. It processes `.edf` (European Data Format) and `.csv` EEG files, computes signal energy using overlapping RMS windows, and identifies candidate seizure segments by robust statistic
 
 ---
 
