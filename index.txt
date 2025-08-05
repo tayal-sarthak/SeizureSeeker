@@ -6,11 +6,11 @@
     <title>Seizure Seeker</title>
 
     <!-- LIBS -->
-     
+
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.5.3/papaparse.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/Neurobotics/jsEDF/edf.js"></script>
 
-    <!-- NEON-CYBER DARK THEME -->
+    <!-- NEON-CYBER DARK THEM E-->
     <style>
       :root {
         --bg:#060607; --card:#12091e; --purple:#6b21a8; --green:#16a34a;
@@ -31,11 +31,6 @@
         text-align:center;font-size:2rem;font-weight:800;
         color:var(--green);text-shadow:0 0 8px rgba(22,163,74,.7);
         margin-bottom:1.5rem
-      }
-      li.center {
-        text-align: center;
-        display: block;
-        margin: 0 auto;
       }
       .card{
         background:var(--card);border:1px solid rgba(255,255,255,.05);
@@ -120,13 +115,6 @@
         </thead>
         <tbody id="resultBody"></tbody>
       </table>
-      <!-- Download Button -->
-      <div style="text-align:right; margin-top:1rem">
-        <button id="downloadBtn" title="Download as CSV"
-          style="display:none; background:var(--purple); color:#fff; padding:.5rem 1rem; border-radius:.5rem; font-size:.9rem;">
-          Download as CSV
-        </button>
-      </div>
     </div>
 
     <!-- HOW IT WORKS -->
@@ -136,12 +124,9 @@
         How this detector works
       </h2>
       <ul style="margin-left:1rem">
-        <li>NOTE: This predictor is not 100% Accurate! PLEASE increase Z-Score to increase confidence!</li>
-        <li>Typical Seizures last 10+ seconds on the low end!</li>
-        <li class="center"><strong>Step By Step Process:</strong>
         <li>Signal is windowed into 1-s RMS frames with 50&nbsp;% overlap.</li>
         <li>Baseline = median + MAD of the <strong>quietest 50&nbsp;%</strong> of RMS frames.</li>
-        <li>Frames above <code>median + z x MAD</code> are flagged.</li>
+        <li>Frames above <code>median + z × MAD</code> are flagged.</li>
         <li>Adjacent hits with gaps ≤ 5&nbsp;s are merged.</li>
         <li>Segments shorter than <strong>15&nbsp;s</strong> are discarded.</li>
       </ul>
@@ -154,17 +139,13 @@
 
     <!-- CORE SCRIPT -->
     <script>
-      const fileInput   = document.getElementById('fileInput');
-      const csvFsWrap   = document.getElementById('csvFsWrap');
-      const statusEl    = document.getElementById('status');
-      const resultCard  = document.getElementById('results');
-      const tbody       = document.getElementById('resultBody');
-      const downloadBtn = document.getElementById('downloadBtn');
+      const fileInput  = document.getElementById('fileInput');
+      const csvFsWrap  = document.getElementById('csvFsWrap');
+      const statusEl   = document.getElementById('status');
+      const resultCard = document.getElementById('results');
+      const tbody      = document.getElementById('resultBody');
 
       let file = null;
-      let lastSegments = [];
-      let lastZ        = +document.getElementById('zThresh').value;
-      let lastMinDur   = +document.getElementById('minDur').value;
 
       fileInput.addEventListener('change', e => {
         file = e.target.files[0] || null;
@@ -186,11 +167,13 @@
           ext === 'csv' ? handleCsv(z, md) : handleEdf(z, md);
         });
 
+      /* ---------- Detection with quietest-50 % baseline ---------- */
       function detect(signal, fs, z = 5, minDur = 15, mergeGap = 5) {
-        const win = Math.round(fs);
-        const hop = Math.round(fs / 2);
+        const win = Math.round(fs);          // 1-s window
+        const hop = Math.round(fs / 2);      // 50 % overlap
         const n   = Math.floor((signal.length - win) / hop) + 1;
 
+        // RMS per window
         const rms = new Float64Array(n);
         for (let i = 0; i < n; i++) {
           let sum = 0;
@@ -201,12 +184,15 @@
           rms[i] = Math.sqrt(sum / win);
         }
 
+        // Baseline from lowest-energy half
         const sorted = Array.from(rms).sort((a, b) => a - b);
         const quiet  = sorted.slice(0, Math.floor(sorted.length * 0.5));
         const median = quiet[Math.floor(quiet.length / 2)];
-        const mad    = quiet.reduce((a,v) => a + Math.abs(v - median), 0) / quiet.length;
-        const thr    = median + z * mad;
+        const mad    = quiet.reduce((acc, v) => acc + Math.abs(v - median), 0) /
+                       quiet.length;
+        const thr = median + z * mad;
 
+        // Flag windows
         const segs = [];
         let start = null;
         for (let i = 0; i < n; i++) {
@@ -215,58 +201,67 @@
           } else if (start !== null) {
             const dur = (i - start) * hop / fs;
             if (dur >= minDur)
-              segs.push({ start: start * hop / fs, end: (i * hop + win) / fs });
+              segs.push({ start: start * hop / fs,
+                          end:   (i * hop + win) / fs });
             start = null;
           }
         }
         if (start !== null) {
           const dur = (n - start) * hop / fs;
           if (dur >= minDur)
-            segs.push({ start: start * hop / fs, end: ((n - 1) * hop + win) / fs });
+            segs.push({ start: start * hop / fs,
+                        end:   ((n - 1) * hop + win) / fs });
         }
 
+        // Merge close detections
         if (!segs.length) return [];
-        segs.sort((a,b) => a.start - b.start);
+        segs.sort((a, b) => a.start - b.start);
         const merged = [segs[0]];
         for (let i = 1; i < segs.length; i++) {
           const last = merged[merged.length - 1];
           if (segs[i].start - last.end <= mergeGap) {
             last.end = Math.max(last.end, segs[i].end);
           } else {
-            merged.push({...segs[i]});
+            merged.push({ ...segs[i] });
           }
         }
         return merged.filter(s => (s.end - s.start) >= minDur);
       }
 
+      /* ---------- Helpers ---------- */
       function populate(segs) {
-        lastSegments = segs.slice();
-        lastZ        = +document.getElementById('zThresh').value;
-        lastMinDur   = +document.getElementById('minDur').value;
-
         tbody.innerHTML = '';
-        segs.forEach((s,i) => {
+        segs.forEach((s, i) => {
           const tr = document.createElement('tr');
-          [i+1, s.start.toFixed(2), s.end.toFixed(2), (s.end - s.start).toFixed(2)]
-            .forEach(t => { const td = document.createElement('td'); td.textContent = t; tr.appendChild(td); });
+          [i + 1, s.start.toFixed(2), s.end.toFixed(2),
+           (s.end - s.start).toFixed(2)]
+            .forEach(t => {
+              const td = document.createElement('td');
+              td.textContent = t;
+              tr.appendChild(td);
+            });
           tbody.appendChild(tr);
         });
-
-        statusEl.textContent = segs.length ? `Detected ${segs.length} segment${segs.length>1?'s':''}` : 'No segments found.';
+        statusEl.textContent = segs.length
+          ? `Detected ${segs.length} segment${segs.length > 1 ? 's' : ''}`
+          : 'No segments found.';
         resultCard.classList.toggle('hidden', !segs.length);
-        downloadBtn.style.display = segs.length ? 'inline-block' : 'none';
       }
 
       function handleCsv(z, md) {
         const fs = +document.getElementById('csvFs').value || 256;
         statusEl.textContent = 'Parsing CSV…';
         Papa.parse(file, {
-          dynamicTyping: true, header: true, skipEmptyLines: true,
+          dynamicTyping: true,
+          header: true,
+          skipEmptyLines: true,
           complete: res => {
             if (!res.data.length) { statusEl.textContent = 'CSV looks empty.'; return; }
-            const keys = Object.keys(res.data[0]).filter(k => typeof res.data[0][k] === 'number');
+            const keys = Object.keys(res.data[0])
+                           .filter(k => typeof res.data[0][k] === 'number');
             if (!keys.length) { statusEl.textContent = 'No numeric columns.'; return; }
-            const sig = res.data.map(r => keys.reduce((s,k)=>s+(r[k]||0),0) / keys.length);
+            const sig = res.data.map(r =>
+              keys.reduce((s, k) => s + (r[k] || 0), 0) / keys.length);
             populate(detect(sig, fs, z, md));
           }
         });
@@ -286,33 +281,14 @@
             const sig = edf.readSingleChannel(0, 0, dur);
             const fs  = sig.length / dur;
             populate(detect(sig, fs, z, md));
-          } catch(err) {
+          } catch (err) {
             console.error(err);
-            statusEl.innerHTML = `<span class="error">EDF parse error: ${err.message||err}</span>`;
+            statusEl.innerHTML =
+              `<span class="error">EDF parse error: ${err.message || err}</span>`;
           }
         };
         reader.readAsArrayBuffer(file);
       }
-
-      downloadBtn.addEventListener('click', () => {
-        if (!lastSegments.length) return;
-        const rows = [
-          ['Z-Score', lastZ],
-          ['Min Duration (s)', lastMinDur],
-          [],
-          ['#','Start (s)','End (s)','Duration (s)']
-        ];
-        lastSegments.forEach((s,i) => rows.push([i+1, s.start.toFixed(2), s.end.toFixed(2), (s.end-s.start).toFixed(2)]));
-        const csvBlob = new Blob([rows.map(r=>r.join(',')).join('\r\n')], {type:'text/csv;charset=utf-8;'});
-        const url = URL.createObjectURL(csvBlob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'seizure_segments.csv';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      });
     </script>
   </body>
 </html>
