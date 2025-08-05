@@ -50,7 +50,7 @@ Seizure Seeker provides an instant, privacy-first tool to detect seizure-like se
   - Minimum duration (`minDur`)
   - Merge gap (fixed at 5s)  
 - **Instant results**: renders a dynamic table in seconds  
-- **Privacy**: EEG  leaves browser
+- **Privacy**: EEG never leaves browser
 
 ---
 
