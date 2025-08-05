@@ -36,7 +36,7 @@ Seizure Seeker is a browser-based application that detects seizure-like events i
 $ git clone https://github.com/your-org/seizure-seeker.git
 $ cd seizure-seeker
 
-# Open the tool
+# Open the too
 $ open seizure_detector.html  # or double-click to open in your browser
 ```
 
