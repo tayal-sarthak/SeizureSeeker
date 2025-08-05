@@ -71,7 +71,7 @@ Open <http://localhost:8000> in your browser.
 
 1. **Select file**: Click “Choose File” & pick `.edf` or `.csv`.  
 2. **(CSV only)**: Enter sampling rate (Hz).  
-3. **Tune**: Set Z‑score & Min Duration.  
+3. **Tune**: set Z‑score & min Duration.  
 4. **Analyze**: Click the button.  
 5. **Inspect**: Review start/end times.
 
