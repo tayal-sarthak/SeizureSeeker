@@ -66,7 +66,7 @@ Once opened:
 ### CSV
 - Header row must be present
 - Only numeric columns are considered
-- Sampling rate must be set manually in the UI
+- Sampling rate must be set manually in UI
 
 ---
 
