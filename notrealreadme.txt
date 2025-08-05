@@ -14,7 +14,7 @@
 
 # Seizure Seeker ⚡
 
-Seizure Seeker is a browser-based application that detects seizure-like events in EEG data provided as `.edf` or `.csv` files. The detection process runs entirely on the client side, ensuring that no data is transmitted externally.
+Seizrue Seeker is a browser-based application that detects seizure-like events in EEG data provided as `.edf` or `.csv` files. The detection process runs entirely on the client side, ensuring that no data is transmitted externally.
 
 ---
 
