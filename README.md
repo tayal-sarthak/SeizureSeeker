@@ -169,7 +169,7 @@ Edit the `detect()` function in `index.html` to modify:
 
 ## License
 
-MIT License © 2025
+This project used the CHB-MIT Scalp EEG Database from PhysioNet, available under the PhysioNet Credentialed Health Data License. Data use is for non-commercial, research purposes only.
 
 ---
 
