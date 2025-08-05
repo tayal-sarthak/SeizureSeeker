@@ -93,7 +93,7 @@ To enable multi-channel voting or apply filters, adapt the signal processing sec
 
 ## 📦 Embedding
 
-To embed Seizre Seeker into another web project:
+To embed Seizrue Seeker into another web project:
 
 ```html
 <iframe src="seizure_detector.html" style="border:none;width:100%;height:700px"></iframe>
