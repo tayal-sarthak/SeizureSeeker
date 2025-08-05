@@ -57,7 +57,7 @@ Once opened:
 
 ---
 
-## 📂 File Format Guidelines
+## 📂 FiFormat Guidelines
 
 ### EDF
 - Regular EDF or EDF+ (16-bit little-endian)
