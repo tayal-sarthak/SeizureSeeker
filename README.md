@@ -83,11 +83,7 @@ Open <http://localhost:8000> in your browser.
 /
 ├─ index.html         # Main UI + detection logic
 ├─ README.md          # This file
-├─ LICENSE            # MIT License
-├─ examples/
-│  └─ sample.edf      # Example EEG recording
-└─ data/
-   └─ sample.csv      # Example CSV data
+
 ```
 
 ---
