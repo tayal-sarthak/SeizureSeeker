@@ -107,6 +107,6 @@ Seizure Seeker is distributed under the MIT License. See the [LICENSE](LICENSE) 
 
 ---
 
-## 🙌 Credits
+## Credits
 
 - Built using [`jsEDF`](https://github.com/Neurobotics/jsEDF) and [`PapaParse`](https://www.papaparse.com)
