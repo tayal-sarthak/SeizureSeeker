@@ -3,7 +3,7 @@
   <img src="https://raw.githubusercontent.com/your-org/seizure-seeker/main/docs/assets/seizure_seeker_logo.png" width="160" alt="Seizure Seeker logo"/>
   <br>
 </p>
-<div align=enter">
+<div align=ente
 
 [![GitHub release](https://img.shields.io/github/v/release/your-org/seizure-seeker?logo=github)](https://github.com/your-org/seizure-seeker/releases)
 [![License](https://img.shields.io/github/license/your-org/seizure-seeker)](LICENSE)
