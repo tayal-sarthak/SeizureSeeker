@@ -1,6 +1,6 @@
 # Seizure Seeker
 
-Seizure Seizure is a browser-based EEG seizure-like event detector that runs entirely client-side. It processes `.edf` (European Data Format) and `.csv` EEG files, computes signal energy using overlapping RMS windows, and identifies candidate seizure segments via robust statistics.
+Seizure Seeker is a browser-based EEG seizure-like event detector that runs entirely client-side. It processes `.edf` (European Data Format) and `.csv` EEG files with multi-channel support, computes signal energy using overlapping RMS windows per channel, identifies candidate seizure segments per channel via robust statistics, and can fuse detections across channels using a K-of-N vote for improved accuracy.
 
 ---
 
@@ -25,7 +25,7 @@ Seizure Seizure is a browser-based EEG seizure-like event detector that runs ent
 
 ## Overview
 
-Seizure Seeker provides an instant, privacy-first tool to detect seizure-like segments in EEG recordings. All processing is done in-browser—no data leaves your machine.
+Seizure Seeker now supports multi-channel EEG recordings, performing detection on each channel independently. It can fuse detections across channels using a configurable K-of-N voting scheme to enhance reliability. All processing is done entirely in-browser—no data leaves your machine—ensuring privacy and instant results.
 
 ---
 
@@ -33,8 +33,8 @@ Seizure Seeker provides an instant, privacy-first tool to detect seizure-like se
 
 1. **Load the app**: serve `index.html` with a static server.  
 2. **Upload** an EEG file (`.edf` or `.csv`).  
-3. **Adjust** detection parameters.  
-4. **Analyze** and view detected segments with start/end times.
+3. **Adjust** detection parameters including fusion options.  
+4. **Analyze** and view detected segments with start/end times per channel and fused results.
 
 > _Tip_: Check out `examples/sample.edf` for a quick test.
 
@@ -42,15 +42,12 @@ Seizure Seeker provides an instant, privacy-first tool to detect seizure-like se
 
 ## Features
 
-- **Input**: EDF/EDF+ & CSV  
-- **On-the-fly parsing**: Papa Parse for CSV, jsEDF for EDF  
-- **Robust baseline**: median + MAD of the quietest 50% of frames  
-- **Parameters**:
-  - Z‑score threshold (`z`)
-  - Minimum duration (`minDur`)
-  - Merge gap (fixed at 5s)  
-- **Instant results**: renders a dynamic table in seconds  
-- **Privacy**: EEG never leaves browser
+- EDF/EDF+ and CSV multi-channel input  
+- Per-channel robust RMS detection  
+- Optional cross-channel fusion with K-of-N voting  
+- User-adjustable Z-score threshold, minimum duration, merge gap, and K value  
+- Instant results rendered dynamically  
+- Privacy: EEG data never leaves the browser
 
 ---
 
@@ -71,9 +68,9 @@ Open <http://localhost:8000> in your browser.
 
 1. **Select file**: Click “Choose File” & pick `.edf` or `.csv`.  
 2. **(CSV only)**: Enter sampling rate (Hz).  
-3. **Tune**: set Z‑score & min Duration.  
+3. **Tune**: set Z-score, min Duration, merge gap, K value, and enable/disable fusion.  
 4. **Analyze**: Click the button.  
-5. **Inspect**: Review start/end times.
+5. **Inspect**: Review start/end times per channel and fused detections.
 
 ---
 
@@ -90,30 +87,33 @@ Open <http://localhost:8000> in your browser.
 
 ## Algorithm Details
 
-**1. Windowing**  
-- 1 s RMS frames with 50% overlap
+**1. Per-Channel Windowing**  
+- 1 s RMS frames with 50% overlap computed independently for each channel.
 
-**2. RMS Energy**  
-\`\`\`  
-rms[i] = sqrt((1/W) * Σ_{j=0..W-1} x[i*hop + j]^2)  
-\`\`\`
+**2. Per-Channel RMS Energy**  
+```
+rms[i][ch] = sqrt((1/W) * Σ_{j=0..W-1} x[ch][i*hop + j]^2)
+```
 
-**3. Baseline**  
-- Sort all `rms`, take lowest 50% → array `quiet`.  
-- \`median = quiet[mid]\`  
-- \`MAD = mean(|quiet - median|)\`
+**3. Per-Channel Baseline**  
+- For each channel, sort all `rms` values, take lowest 50% → array `quiet[ch]`.  
+- Compute `median[ch]` and `MAD[ch]` from `quiet[ch]`.
 
-**4. Threshold**  
-- \`thr = median + z * MAD\`  
-- Frames above \`thr\` are flagged.
+**4. Per-Channel Thresholding**  
+- Threshold for each channel:  
+  `thr[ch] = median[ch] + z * MAD[ch]`  
+- Frames above `thr[ch]` flagged as candidate seizure frames.
 
-**5. Segmentation**  
-- Group consecutive hot frames → initial segments.  
-- Discard segments \< \`minDur\`.
+**5. Per-Channel Segmentation and Merge**  
+- Group consecutive hot frames per channel → initial segments.  
+- Discard segments shorter than `minDur`.  
+- Merge segments separated by ≤ `mergeGap`.  
+- Final filter: discard segments < `minDur`.
 
-**6. Merge Gaps**  
-- Merge segments separated by ≤ 5 s.  
-- Final filter: discard \< \`minDur\`.
+**6. Optional Fusion Step**  
+- Convert each channel’s detections to binary frame vectors.  
+- Apply K-of-N voting across channels (at least K channels must flag a frame).  
+- Convert fused frames back to segments.
 
 ---
 
@@ -123,17 +123,19 @@ rms[i] = sqrt((1/W) * Σ_{j=0..W-1} x[i*hop + j]^2)
 |------------------|---------|----------------------------------------------------------|
 | **z**            | 5       | Multiples of MAD above median to flag a frame.          |
 | **minDur**       | 15 s    | Minimum segment length to accept.                       |
-| **mergeGap**     | 5 s     | Maximum silences to bridge adjacent detections.         |
+| **mergeGap**     | 5 s     | Maximum silence gap to merge adjacent detections.       |
+| **K**            | 1       | Number of channels required to vote for fused detection.|
+| **fusion**       | false   | Enable or disable cross-channel fusion step.             |
 
-Adjust to trade off sensitivity vs. specificity.
+Adjust parameters to balance sensitivity and specificity.
 
 ---
 
 ## Performance
 
-- **Complexity**: O(N) for RMS + segmentation  
-- **Memory**: O(N/2) for RMS array  
-- **Benchmark**: ~0.1 s for a 1 hr, 256 Hz recording on a modern laptop
+- **Complexity**: O(N × channels) for RMS + segmentation  
+- **Memory**: O(N/2 × channels) for RMS arrays  
+- **Benchmark**: ~0.1 s for a 1 hr, 256 Hz, 16-channel recording on a modern laptop
 
 ---
 
@@ -141,16 +143,17 @@ Adjust to trade off sensitivity vs. specificity.
 
 Edit the `detect()` function in `index.html` to modify:
 
-- Window size & overlap  
-- Baseline strategy (e.g., first 5 min vs. quietest 50%)  
-- Merge rules  
-- Multi-channel support
+- Window size and overlap  
+- Baseline calculation logic  
+- Merge rules and gap thresholds  
+- Fusion logic and voting scheme  
+- Channel selection and handling
 
 ---
 
 ## Roadmap
 
-- [ ] Multi-channel detection & per-lead thresholds  
+- [x] Multi-channel detection & per-lead thresholds  
 - [ ] Frequency-band filtering (delta/alpha/beta power)  
 - [ ] Interactive plot overlay  
 - [ ] Command-line & API wrapper  

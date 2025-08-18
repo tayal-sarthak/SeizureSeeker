@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Seizure Seeker</title>
+
+    <!-- LIBS -->
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.5.3/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/Neurobotics/jsEDF/edf.js"></script>
+
+    <!-- NEON-CYBER DARK THEME -->
+    <style>
+      :root {
+        --bg:#060607; --card:#12091e; --purple:#6b21a8; --green:#16a34a;
+        --text:#e5e7eb; --muted:#9ca3af;
+      }
+      *{box-sizing:border-box}
+      html,body{margin:0;padding:0}
+      body{
+        font-family:"Inter",ui-sans-serif,system-ui;
+        background:var(--bg);color:var(--text);line-height:1.6;
+        padding:2rem 1rem 4rem;min-height:100vh;
+        background-image:
+          radial-gradient(circle at 25% 15%,rgba(107,33,168,.25) 0%,transparent 40%),
+          radial-gradient(circle at 75% 85%,rgba(22,163,74,.15) 0%,transparent 45%);
+        background-repeat:no-repeat
+      }
+      h1{
+        text-align:center;font-size:2rem;font-weight:800;
+        color:var(--green);text-shadow:0 0 8px rgba(22,163,74,.7);
+        margin-bottom:1.5rem
+      }
+      li.center { text-align:center; display:block; margin:0 auto; }
+      .card{
+        background:var(--card);border:1px solid rgba(255,255,255,.05);
+        border-radius:1rem;padding:1.75rem 1.5rem;
+        box-shadow:0 8px 24px rgba(0,0,0,.5);
+        margin:0 auto 2rem;max-width:980px
+      }
+      label{font-weight:600;color:var(--muted)}
+      input[type=file],input[type=number]{
+        margin-left:.5rem;padding:.35rem .5rem;background:#09090b;
+        border:1px solid rgba(255,255,255,.1);border-radius:.375rem;
+        color:var(--text)
+      }
+      input[type=checkbox]{ transform:translateY(1px); }
+      select{
+        margin-left:.5rem;padding:.35rem .5rem;background:#09090b;
+        border:1px solid rgba(255,255,255,.1);border-radius:.375rem;
+        color:var(--text)
+      }
+      button{
+        background:linear-gradient(135deg,var(--purple),var(--green));
+        border:none;color:#fff;padding:.6rem 1.2rem;font-weight:700;
+        border-radius:.5rem;cursor:pointer;
+        transition:transform .15s,box-shadow .15s
+      }
+      button:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.4)}
+      fieldset{border:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:1rem 2rem;align-items:center}
+      table{width:100%;border-collapse:collapse;margin-top:1rem}
+      th,td{
+        padding:.5rem .75rem;text-align:left;
+        border-bottom:1px solid rgba(255,255,255,.08)
+      }
+      th{color:var(--green);font-weight:700}
+      .error{color:#f87171;font-weight:600}
+      .hidden{display:none}
+      #status{margin-left:1rem;font-weight:600;color:var(--purple)}
+      footer{text-align:center;margin-top:3rem;color:var(--muted);font-size:.875rem}
+      footer strong{color:var(--green)}
+      .row { display:flex; gap:1rem; flex-wrap:wrap; align-items:center }
+      .row > div { display:flex; align-items:center; gap:.5rem }
+      .muted { color: var(--muted); font-size:.9rem }
+      .tag { display:inline-block; padding:.15rem .5rem; border:1px solid rgba(255,255,255,.1); border-radius:.4rem; margin-left:.4rem; color:var(--muted) }
+    </style>
+  </head>
+  <body>
+    <h1>Seizure Seeker ⚡</h1>
+
+    <!-- CONTROLS -->
+    <div class="card">
+      <p>
+        Pick an EEG file (<strong>.edf</strong> or <strong>.csv</strong>), then select <em>Analyze</em>. The algorithm scans each channel for periods of elevated signal energy. It uses short overlapping windows, a robust baseline, and a threshold you can set manually or let the algorithm choose per-channel. Channels can also be fused with K-of-N consensus to reduce single-lead artifacts.
+      </p>
+
+      <div class="row" style="margin-bottom:.75rem">
+        <input id="fileInput" type="file" accept=".edf,.csv" />
+        <span id="status"></span>
+      </div>
+
+      <fieldset>
+        <div>
+          <label>
+            Z-score threshold
+            <input id="zThresh" type="number" step="0.1" value="7" style="width:5rem">
+          </label>
+        </div>
+        <div>
+          <label>
+            Min duration&nbsp;(s)
+            <input id="minDur" type="number" step="1" value="12" style="width:5rem">
+          </label>
+        </div>
+        <div id="csvFsWrap" class="hidden">
+          <label>
+            Sampling rate&nbsp;(Hz)
+            <input id="csvFs" type="number" step="1" value="256" style="width:6rem">
+          </label>
+        </div>
+      </fieldset>
+
+      <div class="row" style="margin-top:.75rem">
+        <div>
+          <label title="Require at least K channels to be active in the same frame">
+            <input id="useFusion" type="checkbox" checked>
+            Fuse across channels (K-of-N)
+          </label>
+        </div>
+        <div>
+          <label>
+            K
+            <input id="kVotes" type="number" min="1" step="1" value="3" style="width:4.5rem">
+          </label>
+          <span class="muted">(auto-suggested after load)</span>
+        </div>
+        <div>
+          <label>
+            Merge gap&nbsp;(s)
+            <input id="mergeGap" type="number" step="1" value="3" style="width:4.5rem">
+          </label>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:.5rem">
+        <div>
+          <label title="Estimate Z per channel to hit a target % of frames above threshold">
+            <input id="autoTune" type="checkbox" checked>
+            Auto‑Z (per‑channel)
+          </label>
+        </div>
+        <div>
+          <label>
+            Aggressiveness
+            <select id="autoMode">
+              <option value="conservative">Conservative (≈0.2%)</option>
+              <option value="balanced" selected>Balanced (≈0.5%)</option>
+              <option value="sensitive">Sensitive (≈1%)</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <br>
+      <button id="analyzeBtn">Analyze</button>
+    </div>
+
+    <!-- RESULTS -->
+    <div class="card" id="quickGuide">
+      <h2 style="font-size:1.1rem;font-weight:700;color:var(--purple);text-shadow:0 0 6px rgba(107,33,168,.6)">Cheat sheet (read this first)</h2>
+      <ul style="margin-left:1rem">
+        <li><strong>Z-score threshold</strong> - Controls sensitivity. Higher Z flags fewer, larger events. With <em>Auto-Z</em> on, the algorithm selects Z per channel to target about 0.2-1% of frames above threshold (set via <em>Aggressiveness</em>).</li>
+        <li><strong>Min duration (s)</strong> - Discards very short bursts. After merging, segments shorter than this are removed.</li>
+        <li><strong>Merge gap (s)</strong> - Joins nearby bursts if the quiet gap between them is less than or equal to this value.</li>
+        <li><strong>Fuse across channels (K-of-N)</strong> - Requires at least <strong>K</strong> channels to be active at the same time to count as a fused segment.</li>
+        <li><strong>K</strong> - Suggested default is about 20% of channels (minimum 2). Larger K increases strictness and reduces fused segments.</li>
+        <li><strong>Sampling rate (CSV)</strong> - Must match the file (for example, 256 Hz). Incorrect values distort timing. EDF sampling is detected automatically.</li>
+      </ul>
+
+      <h3 style="margin:.75rem 0;color:var(--green);font-size:1.05rem">Quick walkthrough (what you will do)</h3>
+      <ol style="margin-left:1.25rem">
+        <li><strong>Load your file</strong> - For CSV, set the sampling rate. For EDF, labels and rates are read automatically.</li>
+        <li><strong>Choose sensitivity</strong> - Start with <em>Auto-Z (per-channel)</em> at <em>Balanced</em>. If no segments appear, try <em>Sensitive</em>. If there are too many, use <em>Conservative</em> or raise Z after turning Auto-Z off.</li>
+        <li><strong>Decide on fusion</strong> - If there are multiple channels, enable <em>Fuse (K-of-N)</em>. Use the suggested K first; increase K if artifacts remain.</li>
+        <li><strong>Run analysis</strong> - The table lists fused segments (if enabled) and per-channel segments.</li>
+        <li><strong>Export</strong> - Use <em>Download as CSV</em> to export start, end, and duration.</li>
+      </ol>
+    </div>
+    <div id="results" class="card hidden">
+      <h2 style="font-size:1.25rem;font-weight:700;color:var(--purple);text-shadow:0 0 6px rgba(107,33,168,.6)">
+        Detected segments
+      </h2>
+
+      <div id="metaLine" class="muted" style="margin-bottom:.5rem"></div>
+
+      <table>
+        <thead>
+          <tr><th>Source</th><th>Start&nbsp;(s)</th><th>End&nbsp;(s)</th><th>Duration&nbsp;(s)</th></tr>
+        </thead>
+        <tbody id="resultBody"></tbody>
+      </table>
+
+      <div style="text-align:right; margin-top:1rem">
+        <button id="downloadBtn" title="Download as CSV"
+          style="display:none; background:var(--purple); color:#fff; padding:.5rem 1rem; border-radius:.5rem; font-size:.9rem;">
+          Download as CSV
+        </button>
+      </div>
+    </div>
+
+    <div class="card" id="about">
+      <h2 style="font-size:1.25rem;font-weight:700;color:var(--green);text-shadow:0 0 6px rgba(22,163,74,.6)">How the algorithm works</h2>
+      <div style="margin-left:0.25rem">
+        <p class="muted" style="margin:0 0 .75rem 0">This tool and the algorithm were built by multiple students for research and learning. It helps locate EEG time ranges that warrant a closer look. It does not diagnose.</p>
+
+        <h3 style="margin:.5rem 0;color:var(--purple);font-size:1.05rem">Files you can use</h3>
+        <ul style="margin-left:1rem">
+          <li><strong>EDF/EDF+</strong> - Standard EEG. The algorithm reads all channels and their labels.</li>
+          <li><strong>CSV</strong> - Each numeric column is treated as one channel. Set <em>Sampling rate (Hz)</em> correctly.</li>
+        </ul>
+
+        <h3 style="margin:.5rem 0;color:var(--purple);font-size:1.05rem">What a channel is</h3>
+        <p style="margin-left:1rem">A channel is one electrode measured over time. Because true events may appear on some channels and not others, the algorithm analyzes channels separately and can optionally combine them later.</p>
+
+        <h3 style="margin:.5rem 0;color:var(--purple);font-size:1.05rem">Under the hood (per channel)</h3>
+        <ol style="margin-left:1.25rem">
+          <li><strong>Windowing</strong> - One second windows with 0.5 second steps provide overlap so edges are not missed.</li>
+          <li><strong>Energy measure</strong> - Root-mean-square (RMS) is computed per window as a simple amplitude proxy.</li>
+          <li><strong>Robust baseline</strong> - The quietest half of RMS values is used to estimate a median and a median absolute deviation (MAD), which are stable to outliers.</li>
+          <li><strong>Threshold</strong> - <code>threshold = median + Z x MAD</code>. With <em>Auto-Z</em>, the algorithm selects Z so about 0.2-1% of frames exceed threshold (controlled by <em>Aggressiveness</em>).</li>
+          <li><strong>Segments</strong> - Consecutive above-threshold windows form runs. The algorithm merges runs separated by less than or equal to <em>Merge gap</em> and removes runs shorter than <em>Min duration</em>.</li>
+        </ol>
+
+        <h3 style="margin:.5rem 0;color:var(--purple);font-size:1.05rem">Optional: channel fusion (K-of-N)</h3>
+        <p style="margin-left:1rem">Per-channel runs are mapped to a shared timeline and votes are counted. A time point is active only if at least <strong>K</strong> channels agree. Those voted frames are then converted back into segments using the same merge and duration rules.</p>
+
+        <h3 style="margin:.5rem 0;color:var(--purple);font-size:1.05rem">Tuning tips</h3>
+        <ul style="margin-left:1rem">
+          <li>If nothing is detected, lower Z, switch Auto-Z to <em>Sensitive</em>, or reduce <em>Min duration</em>.</li>
+          <li>If too much is detected, raise Z, switch Auto-Z to <em>Conservative</em>, or increase <em>Min duration</em>. With many channels, enable fusion or increase K.</li>
+          <li>If CSV timing looks off, re-check the sampling rate. EDF rates are read automatically.</li>
+        </ul>
+
+        <h3 style="margin:.5rem 0;color:var(--purple);font-size:1.05rem">Reading the results</h3>
+        <ul style="margin-left:1rem">
+          <li>Each row shows <strong>Source</strong> (either <em>Fused</em> or a channel name), <strong>Start</strong>, <strong>End</strong>, and <strong>Duration</strong> in seconds.</li>
+          <li><em>Fused</em> indicates cross-channel consensus; channel rows are single-channel detections.</li>
+          <li>Use <em>Download as CSV</em> to export the segments.</li>
+        </ul>
+
+        <h3 style="margin:.5rem 0;color:var(--purple);font-size:1.05rem">Notes and limitations</h3>
+        <ul style="margin-left:1rem">
+          <li>Research and education only. Not a medical device.</li>
+          <li>Artifacts from muscle, blinks, or movement can elevate energy measures. Always inspect raw EEG and obtain expert review.</li>
+          <li>Processing occurs in the browser; this page does not upload files.</li>
+        </ul>
+      </div>
+    </div>
+
+    <footer>
+      <p>☝️ <strong>Please read the entire page and verify your file</strong>
+         before trusting these results.</p>
+    </footer>
+
+    <!-- CORE SCRIPT -->
+    <script>
+      /* ========== DOM HOOKS ========== */
+      const fileInput   = document.getElementById('fileInput');
+      const csvFsWrap   = document.getElementById('csvFsWrap');
+      const statusEl    = document.getElementById('status');
+      const resultCard  = document.getElementById('results');
+      const tbody       = document.getElementById('resultBody');
+      const downloadBtn = document.getElementById('downloadBtn');
+      const metaLine    = document.getElementById('metaLine');
+
+      const zThreshEl   = document.getElementById('zThresh');
+      const minDurEl    = document.getElementById('minDur');
+      const mergeGapEl  = document.getElementById('mergeGap');
+      const useFusionEl = document.getElementById('useFusion');
+      const kVotesEl    = document.getElementById('kVotes');
+      const autoTuneEl  = document.getElementById('autoTune');
+      const autoModeEl  = document.getElementById('autoMode');
+
+      /* ========== STATE ========== */
+      let file = null;
+      let lastPerChanSegs = [];
+      let lastFusedSegs   = [];
+      let lastNames       = [];
+      let lastMeta        = {};
+      let lastAllRows     = [];
+
+      fileInput.addEventListener('change', e => {
+        file = e.target.files[0] || null;
+        if (!file) return;
+        statusEl.textContent = `Loaded: ${file.name}`;
+        resultCard.classList.add('hidden');
+        csvFsWrap.classList.toggle(
+          'hidden',
+          !file.name.toLowerCase().endsWith('.csv')
+        );
+      });
+
+      document.getElementById('analyzeBtn').addEventListener('click', () => {
+        if (!file) { alert('Pick a file first.'); return; }
+        statusEl.textContent = 'Analyzing…';
+        const z  = +zThreshEl.value;
+        const md = +minDurEl.value;
+        const mg = +mergeGapEl.value;
+        const autoZ = !!autoTuneEl?.checked;
+        const autoMode = autoModeEl ? autoModeEl.value : 'balanced';
+        const ext = file.name.split('.').pop().toLowerCase();
+        if (ext === 'csv') {
+          handleCsv(z, md, mg, { autoZ, autoMode });
+        } else {
+          handleEdf(z, md, mg, { autoZ, autoMode });
+        }
+      });
+
+      /* ========== CORE DETECTOR (unchanged logic, now reusable) ========== */
+      function detect(signal, fs, z = 7, minDur = 12, mergeGap = 3, opts = {}) {
+        const win = Math.max(1, Math.round(fs));       // 1s window
+        const hop = Math.max(1, Math.round(fs / 2));   // 50% overlap
+        const n   = Math.max(0, Math.floor((signal.length - win) / hop) + 1);
+        if (n <= 0) return { segs: [], usedZ: z };
+
+        // Framewise RMS
+        const rms = new Float64Array(n);
+        for (let i = 0; i < n; i++) {
+          let sum = 0;
+          const base = i * hop;
+          for (let j = 0; j < win; j++) {
+            const v = signal[base + j] || 0;
+            sum += v * v;
+          }
+          rms[i] = Math.sqrt(sum / win);
+        }
+
+        // Robust baseline from quietest 50% frames
+        const sorted = Array.from(rms).sort((a, b) => a - b);
+        const quietN = Math.max(1, Math.floor(sorted.length * 0.5));
+        const quiet  = sorted.slice(0, quietN);
+        const median = quiet[Math.floor(quiet.length / 2)];
+        const mad    = quiet.reduce((a,v) => a + Math.abs(v - median), 0) / quiet.length || 1e-9;
+
+        // Auto‑Z: choose Z so only ~p of frames exceed threshold
+        let usedZ = z;
+        if (opts.autoZ) {
+          let p = 0.005; // balanced default ~0.5%
+          if (opts.autoMode === 'conservative') p = 0.002;
+          if (opts.autoMode === 'sensitive')    p = 0.01;
+
+          // Binary search Z in [2, 15]
+          let lo = 2, hi = 15;
+          for (let iter = 0; iter < 18; iter++) {
+            const mid = (lo + hi) / 2;
+            const thr = median + mid * mad;
+            let above = 0;
+            for (let i = 0; i < n; i++) if (rms[i] > thr) above++;
+            const frac = above / n;
+            if (frac > p) lo = mid; else hi = mid;
+          }
+          usedZ = Math.max(2, Math.min(15, (lo + hi) / 2));
+        }
+
+        const thr = median + usedZ * mad;
+
+        // Frame hits ➜ segments
+        const segs = [];
+        let startF = null;
+        for (let i = 0; i < n; i++) {
+          if (rms[i] > thr) {
+            if (startF === null) startF = i;
+          } else if (startF !== null) {
+            const s = startF * hop / fs;
+            const e = (i * hop + win) / fs;
+            if (e - s >= minDur) segs.push({ start: s, end: e });
+            startF = null;
+          }
+        }
+        if (startF !== null) {
+          const s = startF * hop / fs;
+          const e = ((n - 1) * hop + win) / fs;
+          if (e - s >= minDur) segs.push({ start: s, end: e });
+        }
+
+        if (!segs.length) return { segs: [], usedZ };
+        segs.sort((a,b) => a.start - b.start);
+        const merged = [segs[0]];
+        for (let i = 1; i < segs.length; i++) {
+          const last = merged[merged.length - 1];
+          if (segs[i].start - last.end <= mergeGap) {
+            last.end = Math.max(last.end, segs[i].end);
+          } else {
+            merged.push({ ...segs[i] });
+          }
+        }
+        const finalSegs = merged.filter(s => (s.end - s.start) >= minDur);
+        return { segs: finalSegs, usedZ };
+      }
+
+      /* ========== FUSION HELPERS ========== */
+      // Convert segments to frame hits on a uniform fusion grid (duration T, fusionFs)
+      function rasterizeSegmentsToFrames(segs, T, fusionFs) {
+        const win = Math.max(1, Math.round(fusionFs));       // 1s
+        const hop = Math.max(1, Math.round(fusionFs / 2));   // 0.5s
+        const n   = Math.max(0, Math.floor((T * fusionFs - win) / hop) + 1);
+        const frames = new Uint8Array(n); // 0/1
+
+        for (const s of segs) {
+          if (!isFinite(s.start) || !isFinite(s.end)) continue;
+          const startF = Math.max(0, Math.floor((s.start * fusionFs - win) / hop) + 1);
+          const endF   = Math.min(n - 1, Math.floor((s.end   * fusionFs - win) / hop) + 1);
+          for (let i = startF; i <= endF; i++) frames[i] = 1;
+        }
+        return { frames, win, hop, n };
+      }
+
+      // From voted frames back to segments with same rules
+      function framesToSegments(voted, win, hop, fs, minDur, mergeGap) {
+        const segs = [];
+        let start = null;
+        for (let i = 0; i < voted.length; i++) {
+          if (voted[i]) { if (start === null) start = i; }
+          else if (start !== null) {
+            const s = start * hop / fs;
+            const e = (i * hop + win) / fs;
+            if (e - s >= minDur) segs.push({ start: s, end: e });
+            start = null;
+          }
+        }
+        if (start !== null) {
+          const s = start * hop / fs;
+          const e = ((voted.length - 1) * hop + win) / fs;
+          if (e - s >= minDur) segs.push({ start: s, end: e });
+        }
+
+        // Gap-merge + minDur
+        if (!segs.length) return [];
+        segs.sort((a,b)=>a.start-b.start);
+        const merged=[segs[0]];
+        for (let i=1;i<segs.length;i++){
+          const last=merged[merged.length-1];
+          if (segs[i].start - last.end <= mergeGap) {
+            last.end = Math.max(last.end, segs[i].end);
+          } else {
+            merged.push({ ...segs[i] });
+          }
+        }
+        return merged.filter(s => (s.end - s.start) >= minDur);
+      }
+
+      // K-of-N vote from per-channel segments (no resampling of raw signals required)
+      function fuseSegments(perChanSegs, T, fusionFs, minDur, mergeGap, K) {
+        const rasters = perChanSegs.map(segs => rasterizeSegmentsToFrames(segs, T, fusionFs));
+        if (!rasters.length) return [];
+        const n = rasters[0].n, win = rasters[0].win, hop = rasters[0].hop;
+        // Sum votes per frame
+        const voted = new Uint8Array(n);
+        for (let i = 0; i < n; i++) {
+          let count = 0;
+          for (const r of rasters) count += r.frames[i];
+          voted[i] = (count >= K) ? 1 : 0;
+        }
+        // Convert back to segments
+        return framesToSegments(voted, win, hop, fusionFs, minDur, mergeGap);
+      }
+
+      /* ========== CSV PATH (multi-channel) ========== */
+      function handleCsv(z, md, mg, opts = {}) {
+        const fs = +document.getElementById('csvFs').value || 256;
+        statusEl.textContent = 'Parsing CSV…';
+        Papa.parse(file, {
+          dynamicTyping: true, header: true, skipEmptyLines: true,
+          complete: res => {
+            if (!res.data.length) { statusEl.textContent = 'CSV looks empty.'; return; }
+            const keys = Object.keys(res.data[0]).filter(k => typeof res.data[0][k] === 'number');
+            if (!keys.length) { statusEl.textContent = 'No numeric columns.'; return; }
+
+            // Assemble per-channel arrays (assume equal length)
+            const chans = keys.map(k => res.data.map(r => +r[k] || 0));
+            const T = chans[0].length / fs;  // duration in seconds
+
+            // Per-channel detection
+            const perChan = chans.map(sig => detect(sig, fs, z, md, mg, { autoZ: opts.autoZ, autoMode: opts.autoMode }));
+            const perChanSegs = perChan.map(o => o.segs);
+            const usedZs = perChan.map(o => o.usedZ);
+
+            // Fusion (optional)
+            const useFusion = useFusionEl.checked;
+            const K = Math.max(1, +kVotesEl.value || 1);
+            const fusionFs = fs;  // CSV: use the provided fs for the fusion grid
+            const fusedSegs = useFusion && chans.length > 1
+              ? fuseSegments(perChanSegs, T, fusionFs, md, mg, Math.min(K, chans.length))
+              : [];
+
+            // Update suggested K (20% rule)
+            setSuggestedK(keys.length);
+
+            populateMulti(
+              perChanSegs,
+              keys,
+              fusedSegs,
+              {
+                fs: fs,
+                fusionFs,
+                duration: T,
+                z: opts.autoZ ? `auto (${opts.autoMode})` : z,
+                md,
+                mg,
+                K,
+                useFusion,
+                usedZs
+              }
+            );
+          }
+        });
+      }
+
+      /* ========== EDF PATH (multi-channel) ========== */
+      function handleEdf(z, md, mg, opts = {}) {
+        if (typeof EDF === 'undefined') {
+          statusEl.innerHTML = '<span class="error">EDF lib failed to load.</span>';
+          return;
+        }
+        statusEl.textContent = 'Reading EDF…';
+        const reader = new FileReader();
+        reader.onload = e => {
+          try {
+            const edf = new EDF(new Uint8Array(e.target.result));
+            const T = edf.duration; // seconds
+
+            // Try labels & channel count
+            const labels = (edf.header && edf.header.signal_labels) ? edf.header.signal_labels : [];
+            const chCount = labels.length || (edf.signals ? edf.signals.length : 1);
+
+            // Read per-channel once for detection; store fs_i and segments
+            const perChanSegs = [];
+            const names = [];
+            const fsList = [];
+            let maxFs = 0;
+            const usedZs = [];
+
+            for (let ch = 0; ch < chCount; ch++) {
+              const sig = edf.readSingleChannel(ch, 0, T);
+              const fs  = sig.length / T;
+              fsList.push(fs);
+              maxFs = Math.max(maxFs, fs);
+              names.push(labels[ch] || `Ch${ch+1}`);
+              const res = detect(sig, fs, z, md, mg, { autoZ: opts.autoZ, autoMode: opts.autoMode });
+              perChanSegs.push(res.segs);
+              usedZs.push(res.usedZ);
+            }
+
+            // Fusion grid at maxFs (no raw resample needed—operate on segments)
+            const useFusion = useFusionEl.checked;
+            const K = Math.max(1, +kVotesEl.value || 1);
+            const fusionFs = Math.max(1, Math.round(maxFs));
+            const fusedSegs = (useFusion && chCount > 1)
+              ? fuseSegments(perChanSegs, T, fusionFs, md, mg, Math.min(K, chCount))
+              : [];
+
+            // Update suggested K (20% rule)
+            setSuggestedK(chCount);
+
+            populateMulti(
+              perChanSegs,
+              names,
+              fusedSegs,
+              {
+                fs: '(per-channel)',
+                fusionFs,
+                duration: T,
+                z: opts.autoZ ? `auto (${opts.autoMode})` : z,
+                md,
+                mg,
+                K,
+                useFusion,
+                usedZs
+              }
+            );
+          } catch(err) {
+            console.error(err);
+            statusEl.innerHTML = `<span class="error">EDF parse error: ${err.message||err}</span>`;
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      }
+
+      /* ========== UI POPULATION ========== */
+      function populateMulti(perChanSegs, chanNames, fusedSegs, meta) {
+        lastPerChanSegs = perChanSegs.map(s => s.slice());
+        lastFusedSegs   = fusedSegs.slice();
+        lastNames       = chanNames.slice();
+        lastMeta        = { ...meta };
+
+        const zInfo = (typeof meta.z === 'string') ? meta.z : meta.z.toString();
+
+        tbody.innerHTML = '';
+        const rows = [];
+
+        // Fused first
+        if (fusedSegs.length) {
+          fusedSegs.forEach((s,i) => {
+            rows.push([ `Fused #${i+1}`, s.start.toFixed(2), s.end.toFixed(2), (s.end - s.start).toFixed(2) ]);
+          });
+        }
+
+        // Per-channel lines
+        perChanSegs.forEach((segs, ci) => {
+          segs.forEach((s,i) => {
+            rows.push([ `${chanNames[ci]} #${i+1}`, s.start.toFixed(2), s.end.toFixed(2), (s.end - s.start).toFixed(2) ]);
+          });
+        });
+
+        // Render table
+        rows.forEach(r => {
+          const tr = document.createElement('tr');
+          r.forEach(text => { const td = document.createElement('td'); td.textContent = text; tr.appendChild(td); });
+          tbody.appendChild(tr);
+        });
+
+        // Meta line
+        const fusedTag = lastFusedSegs.length ? `<span class="tag">Fused=${lastFusedSegs.length}</span>` : '';
+        const perChanTotals = perChanSegs.map((s,i)=>`${chanNames[i]}=${s.length}`).join(', ');
+        metaLine.innerHTML = `
+          Channels: <strong>${chanNames.length}</strong>
+          <span class="tag">z=${zInfo}</span>
+          <span class="tag">minDur=${meta.md}s</span>
+          <span class="tag">mergeGap=${meta.mg}s</span>
+          ${meta.useFusion ? `<span class="tag">K=${meta.K}</span>` : `<span class="tag">Fusion=off</span>`}
+          <span class="tag">fusionFs=${meta.fusionFs}</span>
+          <span class="tag">T=${meta.duration.toFixed ? meta.duration.toFixed(2) : meta.duration}s</span>
+          ${fusedTag}
+          <div class="muted" style="margin-top:.35rem">Per-channel totals: ${perChanTotals || 'none'}</div>
+          ${meta.usedZs ? `<div class="muted" style="margin-top:.2rem">Per‑channel Z (auto): ${meta.usedZs.map((v,i)=>`${lastNames[i]}=${(+v).toFixed(2)}`).join(', ')}</div>` : ''}
+        `;
+
+        // Status & card visibility
+        const any = rows.length > 0;
+        statusEl.textContent = any
+          ? `Fused segments: ${fusedSegs.length} • Per-channel segments: ${perChanSegs.reduce((a,s)=>a+s.length,0)}`
+          : 'No segments found at current settings. Try lower z (or Sensitive auto‑mode) or reduce min duration.';
+        resultCard.classList.toggle('hidden', !any);
+        downloadBtn.style.display = any ? 'inline-block' : 'none';
+
+        // Cache rows for download
+        lastAllRows = rows;
+      }
+
+      function setSuggestedK(nCh) {
+        // If user hasn't touched K, nudge to ceil(20% of channels) with a floor of 2
+        const current = +kVotesEl.value;
+        const suggested = Math.max(2, Math.ceil(nCh * 0.20));
+        // Only auto-adjust if K > nCh or K < 1 or K == 2 and channels changed a lot
+        if (current < 1 || current > nCh || current === 2) {
+          kVotesEl.value = Math.min(suggested, nCh);
+        }
+      }
+
+      /* ========== DOWNLOAD ========== */
+      downloadBtn.addEventListener('click', () => {
+        const hdr = [
+          ['File', file ? file.name : ''],
+          ['Channels', lastNames.length],
+          ['Fusion', lastMeta.useFusion ? `on (K=${lastMeta.K})` : 'off'],
+          ['z', lastMeta.z], ['minDur(s)', lastMeta.md], ['mergeGap(s)', lastMeta.mg],
+          ['fusionFs(Hz)', lastMeta.fusionFs], ['duration(s)', lastMeta.duration],
+          [],
+          ['Source','Start (s)','End (s)','Duration (s)']
+        ];
+        const perChanRows = [];
+        lastPerChanSegs.forEach((segs, ci) => {
+          segs.forEach((s, i) => perChanRows.push([ `${lastNames[ci]} #${i+1}`, s.start.toFixed(2), s.end.toFixed(2), (s.end-s.start).toFixed(2) ]));
+        });
+        const fusedRows = lastFusedSegs.map((s,i)=>[ `Fused #${i+1}`, s.start.toFixed(2), s.end.toFixed(2), (s.end-s.start).toFixed(2) ]);
+
+        const rows = [...hdr, ...fusedRows, ...perChanRows];
+        const csvBlob = new Blob([rows.map(r=>r.join(',')).join('\r\n')], {type:'text/csv;charset=utf-8;'});
+        const url = URL.createObjectURL(csvBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'seizure_segments_multichannel.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      });
+      // --- Z input auto-disable helper ---
+      function refreshZInputState(){
+        if (!zThreshEl) return;
+        const auto = !!autoTuneEl?.checked;
+        zThreshEl.disabled = auto;
+        zThreshEl.style.opacity = auto ? 0.6 : 1;
+      }
+      autoTuneEl?.addEventListener('change', refreshZInputState);
+      refreshZInputState();
+    </script>
+  </body>
+</html>
