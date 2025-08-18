@@ -1,76 +1,64 @@
 # Seizure Seeker
 
-Seizure Seeker is a browser-based EEG seizure-like event detector that runs entirely client-side. It processes `.edf` (European Data Format) and `.csv` EEG files with multi-channel support, computes signal energy using overlapping RMS windows per channel, identifies candidate seizure segments per channel via robust statistics, and can fuse detections across channels using a K-of-N vote for improved accuracy.
+Seizure Seeker is a browser based EEG event detector; built by multiple students; designed for research and learning. The algorithm runs fully on the client; it reads `.edf` and `.csv` EEG files with many channels; computes simple energy features with overlapping RMS windows; finds candidate segments using a robust baseline; and can fuse detections across channels using a K of N vote. Your data stays on your machine.
 
 ---
 
 ## Table of Contents
 
 1. [Overview](#overview)  
-2. [Demo](#demo)  
+2. [Quick Start](#quick-start)  
 3. [Features](#features)  
-4. [Installation](#installation)  
-5. [Usage](#usage)  
-6. [Repository Structure](#repository-structure)  
-7. [Algorithm Details](#algorithm-details)  
-8. [Parameter Tuning](#parameter-tuning)  
-9. [Performance](#performance)  
-10. [Customization](#customization)  
-11. [Roadmap](#roadmap)  
-12. [Contributing](#contributing)  
-13. [License](#license)  
-14. [Contact](#contact)  
+4. [Usage](#usage)  
+5. [Repository Structure](#repository-structure)  
+6. [How the algorithm works](#how-the-algorithm-works)  
+7. [Parameter Tuning](#parameter-tuning)  
+8. [Performance](#performance)  
+9. [Customization](#customization)  
+10. [Roadmap](#roadmap)  
+11. [Contributing](#contributing)  
+12. [License](#license)  
+13. [Contact](#contact)
 
 ---
 
 ## Overview
 
-Seizure Seeker now supports multi-channel EEG recordings, performing detection on each channel independently. It can fuse detections across channels using a configurable K-of-N voting scheme to enhance reliability. All processing is done entirely in-browser—no data leaves your machine—ensuring privacy and instant results.
+Seizure Seeker performs detection per channel; then it can combine results across channels if you ask it to. Everything happens in the browser; nothing is uploaded. The goal is to help you flag time ranges that deserve a closer look; not to diagnose.
 
 ---
 
-## Demo
+## Quick Start
 
-1. **Load the app**: serve `index.html` with a static server.  
-2. **Upload** an EEG file (`.edf` or `.csv`).  
-3. **Adjust** detection parameters including fusion options.  
-4. **Analyze** and view detected segments with start/end times per channel and fused results.
+1. Serve `index.html` with a simple static server.  
+2. Load an EEG file; `.edf` or `.csv` both work.  
+3. For `.csv` files; enter the sampling rate in Hz.  
+4. Adjust sensitivity and optional fusion.  
+5. Run the analysis; inspect per channel and fused segments; export to CSV when ready.
 
-> _Tip_: Check out `examples/sample.edf` for a quick test.
+> Tip; try `examples/sample.edf` for a fast check.
 
 ---
 
 ## Features
 
-- EDF/EDF+ and CSV multi-channel input  
-- Per-channel robust RMS detection  
-- Optional cross-channel fusion with K-of-N voting  
-- User-adjustable Z-score threshold, minimum duration, merge gap, and K value  
-- Instant results rendered dynamically  
-- Privacy: EEG data never leaves the browser
-
----
-
-## Installation
-
-```bash
-git clone https://github.com/yourusername/seizure-seeker.git
-cd seizure-seeker
-# Serve locally
-python3 -m http.server 8000
-```
-
-Open <http://localhost:8000> in your browser.
+* EDF and CSV input with many channels  
+* Per channel RMS energy with overlap  
+* Optional cross channel fusion with K of N voting  
+* Controls for Z score; minimum duration; merge gap; and K  
+* Instant feedback in the page  
+* Privacy; processing stays local
 
 ---
 
 ## Usage
 
-1. **Select file**: Click “Choose File” & pick `.edf` or `.csv`.  
-2. **(CSV only)**: Enter sampling rate (Hz).  
-3. **Tune**: set Z-score, min Duration, merge gap, K value, and enable/disable fusion.  
-4. **Analyze**: Click the button.  
-5. **Inspect**: Review start/end times per channel and fused detections.
+1. Select a file; choose `.edf` or `.csv`.  
+2. If you chose `.csv`; enter the sampling rate in Hz.  
+3. Tune the controls; Z score; Min Duration; Merge Gap; K; and toggle Fusion if needed.  
+4. Press Analyze.  
+5. Review the table; you will see per channel rows and fused rows if fusion is on.  
+6. Click Download as CSV to save the segments.
 
 ---
 
@@ -78,86 +66,75 @@ Open <http://localhost:8000> in your browser.
 
 ```
 /
-├─ index.html         # Main UI + detection logic
+├─ index.html         # Main UI and detection logic
 ├─ README.md          # This file
-
 ```
 
 ---
 
-## Algorithm Details
+## How the algorithm works
 
-**1. Per-Channel Windowing**  
-- 1 s RMS frames with 50% overlap computed independently for each channel.
+**Per channel windowing**  
+The signal is split into 1 s windows with 0.5 s steps; this overlap helps catch edges.  
 
-**2. Per-Channel RMS Energy**  
-```
-rms[i][ch] = sqrt((1/W) * Σ_{j=0..W-1} x[ch][i*hop + j]^2)
-```
+**Per channel energy**  
+For each window the algorithm computes RMS; a compact proxy for signal amplitude.  
 
-**3. Per-Channel Baseline**  
-- For each channel, sort all `rms` values, take lowest 50% → array `quiet[ch]`.  
-- Compute `median[ch]` and `MAD[ch]` from `quiet[ch]`.
+**Robust baseline**  
+For each channel the algorithm sorts window RMS values; takes the quietest half; then computes the median and the median absolute deviation MAD. These two numbers resist outliers and artifacts.  
 
-**4. Per-Channel Thresholding**  
-- Threshold for each channel:  
-  `thr[ch] = median[ch] + z * MAD[ch]`  
-- Frames above `thr[ch]` flagged as candidate seizure frames.
+**Thresholding**  
+For each channel the threshold is `median + z * MAD`; frames above the threshold are candidates. With Auto Z; the algorithm picks z so that only a small fraction of frames exceed the threshold; you control this with Aggressiveness.  
 
-**5. Per-Channel Segmentation and Merge**  
-- Group consecutive hot frames per channel → initial segments.  
-- Discard segments shorter than `minDur`.  
-- Merge segments separated by ≤ `mergeGap`.  
-- Final filter: discard segments < `minDur`.
+**Segmentation and merge**  
+Consecutive candidate frames form runs; runs separated by at most Merge Gap are merged; segments shorter than Min Duration are dropped.  
 
-**6. Optional Fusion Step**  
-- Convert each channel’s detections to binary frame vectors.  
-- Apply K-of-N voting across channels (at least K channels must flag a frame).  
-- Convert fused frames back to segments.
+**Optional fusion K of N**  
+The algorithm converts per channel runs to a shared time grid; counts votes across channels; and marks time points as positive when at least K channels agree; then it converts those positive points back into segments with the same merge and duration rules.  
 
 ---
 
 ## Parameter Tuning
 
-| Parameter        | Default | Description                                              |
-|------------------|---------|----------------------------------------------------------|
-| **z**            | 5       | Multiples of MAD above median to flag a frame.          |
-| **minDur**       | 15 s    | Minimum segment length to accept.                       |
-| **mergeGap**     | 5 s     | Maximum silence gap to merge adjacent detections.       |
-| **K**            | 1       | Number of channels required to vote for fused detection.|
-| **fusion**       | false   | Enable or disable cross-channel fusion step.             |
+* Z score; higher values mean stricter detection; fewer segments pass  
+* Min Duration in seconds; removes very short blips after merging  
+* Merge Gap in seconds; glues nearby runs when the quiet gap is small  
+* Fusion; enable K of N voting to reduce single channel artifacts  
+* K; suggested default is about twenty percent of channels with a floor of two  
+* Sampling rate for CSV; must match the file; EDF rates are read automatically
 
-Adjust parameters to balance sensitivity and specificity.
+Practical advice; if you see nothing; lower Z or reduce Min Duration or switch Auto Z to Sensitive. If you see too much; raise Z or increase Min Duration or pick Conservative; and with many channels try enabling fusion or increasing K.
 
 ---
 
 ## Performance
 
-- **Complexity**: O(N × channels) for RMS + segmentation  
-- **Memory**: O(N/2 × channels) for RMS arrays  
-- **Benchmark**: ~0.1 s for a 1 hr, 256 Hz, 16-channel recording on a modern laptop
+* Complexity; O(N * channels) for RMS and segmentation  
+* Memory; about O(N/2 * channels) for RMS arrays  
+* Benchmark; around 0.1 s for a 1 hour; 256 Hz; 16 channel recording on a modern laptop
+
+Numbers will vary with hardware; file size; and browser.
 
 ---
 
 ## Customization
 
-Edit the `detect()` function in `index.html` to modify:
-
-- Window size and overlap  
-- Baseline calculation logic  
-- Merge rules and gap thresholds  
-- Fusion logic and voting scheme  
-- Channel selection and handling
+Edit the `detect()` function in `index.html` if you want to change any of the following  
+* window size and hop  
+* baseline estimation  
+* merge rules  
+* fusion logic and voting  
+* channel selection
 
 ---
 
 ## Roadmap
 
-- [x] Multi-channel detection & per-lead thresholds  
-- [ ] Frequency-band filtering (delta/alpha/beta power)  
-- [ ] Interactive plot overlay  
-- [ ] Command-line & API wrapper  
-- [ ] Real-time streaming mode
+* Multi channel detection and per lead thresholds  
+* Frequency band filtering  
+* Interactive plot overlay  
+* Command line and API wrapper  
+* Real time streaming mode
 
 ---
 
@@ -166,16 +143,16 @@ Edit the `detect()` function in `index.html` to modify:
 1. Fork the repo  
 2. Create a branch  
 3. Submit a PR  
-4. Celebrate 🎉
+4. Celebrate
 
 ---
 
 ## License
 
-This project used the CHB-MIT Scalp EEG Database from PhysioNet, available under the PhysioNet Credentialed Health Data License. Data use is for non-commercial, research purposes only.
+This project uses the CHB MIT Scalp EEG Database from PhysioNet; available under the PhysioNet Credentialed Health Data License. Use is limited to non commercial research purposes.
 
 ---
 
 ## Contact
 
-For questions or feedback, contact [sarthaktayal2@gmail.com].
+Questions or feedback; email sarthaktayal2@gmail.com
