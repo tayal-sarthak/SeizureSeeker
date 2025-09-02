@@ -88,6 +88,12 @@
         <input id="fileInput" type="file" accept=".edf,.csv" />
         <span id="status"></span>
       </div>
+      <div class="row" style="margin-bottom:.75rem">
+        <label class="muted">Load tuning CSV (optional)
+          <input id="tuningInput" type="file" accept=".csv" style="margin-left:.5rem" />
+        </label>
+        <span id="tuneStatus" class="muted"></span>
+      </div>
 
       <fieldset>
         <div>
@@ -271,6 +277,14 @@
       const autoTuneEl  = document.getElementById('autoTune');
       const autoModeEl  = document.getElementById('autoMode');
 
+      const tuningInput = document.getElementById('tuningInput');
+      const tuneStatus  = document.getElementById('tuneStatus');
+
+      // Learned per‑file tuning loaded from detect_summary.csv (or similar)
+      // Map: basename -> { useFusion, K, autoMode, minDur, mergeGap, autoZ, z }
+      let tuningMap = new Map();
+      let tuningAppliedFor = null;
+
       /* ========== STATE ========== */
       let file = null;
       let lastPerChanSegs = [];
@@ -278,19 +292,131 @@
       let lastNames       = [];
       let lastMeta        = {};
       let lastAllRows     = [];
+      function basenameOnly(name){
+        if (!name) return '';
+        const n = name.split('/').pop();
+        return n;
+      }
+
+      function parseBool(v){
+        if (typeof v === 'boolean') return v;
+        if (v == null) return undefined;
+        const s = String(v).trim().toLowerCase();
+        if (s === '1' || s === 'true' || s === 'yes' || s === 'y') return true;
+        if (s === '0' || s === 'false' || s === 'no'  || s === 'n') return false;
+        return undefined;
+      }
+
+      function numOrUndef(v){
+        const x = Number(v);
+        return Number.isFinite(x) ? x : undefined;
+      }
+
+      function applyTuningForFile(basename){
+        tuningAppliedFor = null;
+        if (!basename || !tuningMap.size) return;
+        const row = tuningMap.get(basename);
+        if (!row) { if (tuneStatus) tuneStatus.textContent = `No tuning found for ${basename}`; return; }
+
+        // Apply fields defensively
+        if (row.autoZ !== undefined) {
+          autoTuneEl.checked = !!row.autoZ;
+          refreshZInputState?.();
+        }
+        if (row.z !== undefined && !autoTuneEl.checked) {
+          zThreshEl.value = String(row.z);
+        }
+        if (row.minDur !== undefined) minDurEl.value = String(row.minDur);
+        if (row.mergeGap !== undefined) mergeGapEl.value = String(row.mergeGap);
+        if (row.useFusion !== undefined) useFusionEl.checked = !!row.useFusion;
+        if (row.K !== undefined) kVotesEl.value = String(row.K);
+        if (row.autoMode) {
+          const val = String(row.autoMode).toLowerCase();
+          if ([...autoModeEl.options].some(o => o.value === val)) autoModeEl.value = val;
+        }
+
+        tuningAppliedFor = basename;
+        if (tuneStatus) {
+          const bits = [];
+          if (row.useFusion !== undefined) bits.push(`Fusion=${row.useFusion ? 'on' : 'off'}`);
+          if (row.K !== undefined) bits.push(`K=${row.K}`);
+          if (row.autoZ !== undefined) bits.push(`Auto‑Z=${row.autoZ ? (row.autoMode||'') : 'off'}`);
+          if (row.z !== undefined && !row.autoZ) bits.push(`Z=${row.z}`);
+          if (row.minDur !== undefined) bits.push(`minDur=${row.minDur}`);
+          if (row.mergeGap !== undefined) bits.push(`mergeGap=${row.mergeGap}`);
+          tuneStatus.textContent = `Applied tuning for ${basename}: ${bits.join(' • ')}`;
+        }
+      }
+
+      function ingestTuningCsv(file){
+        if (!file) return;
+        if (tuneStatus) tuneStatus.textContent = 'Loading tuning CSV…';
+        Papa.parse(file, {
+          header: true, dynamicTyping: true, skipEmptyLines: true,
+          complete: res => {
+            tuningMap = new Map();
+            const rows = res.data || [];
+            for (const r of rows){
+              // Column name normalization (case/space/dash insensitive)
+              const norm = {};
+              for (const [k,v] of Object.entries(r)){
+                if (k == null) continue;
+                const key = String(k).toLowerCase().replace(/\s+/g,'').replace(/[-_]+/g,'');
+                norm[key] = v;
+              }
+              const fileKey = norm.file || norm.filename || norm.edf || norm.basename || norm.name;
+              if (!fileKey) continue;
+              const base = basenameOnly(String(fileKey));
+              const row = {
+                useFusion: parseBool(norm.usefusion ?? norm.fuse ?? norm.fusion),
+                K: numOrUndef(norm.k),
+                autoMode: norm.automode || norm.mode,
+                minDur: numOrUndef(norm.mindur ?? norm.minduration),
+                mergeGap: numOrUndef(norm.mergegap ?? norm.gap),
+                autoZ: parseBool(norm.autoz ?? norm.autothresh ?? norm.autothreshold),
+                z: numOrUndef(norm.z ?? norm.zscore ?? norm.thresholdz)
+              };
+              tuningMap.set(base, row);
+            }
+            const count = tuningMap.size;
+            if (tuneStatus) tuneStatus.textContent = count ? `Loaded tuning for ${count} file(s).` : 'No usable rows found in tuning CSV.';
+
+            // If an EEG file is already chosen, try to apply immediately
+            if (fileInput?.files?.[0]) applyTuningForFile(basenameOnly(fileInput.files[0].name));
+          }
+        });
+      }
+
+      tuningInput?.addEventListener('change', e => {
+        const f = e.target.files?.[0];
+        ingestTuningCsv(f);
+      });
 
       fileInput.addEventListener('change', e => {
         file = e.target.files[0] || null;
         if (!file) return;
         statusEl.textContent = `Loaded: ${file.name}`;
+        // If we have learned tuning, apply it now (by basename)
+        applyTuningForFile(basenameOnly(file.name));
         resultCard.classList.add('hidden');
         csvFsWrap.classList.toggle(
           'hidden',
           !file.name.toLowerCase().endsWith('.csv')
         );
+        // Auto-run once a file is picked so the user only has to click once
+        const btn = document.getElementById('analyzeBtn');
+        if (btn) {
+          btn.disabled = true;
+          setTimeout(() => { btn.click(); btn.disabled = false; }, 300);
+        }
       });
 
       document.getElementById('analyzeBtn').addEventListener('click', () => {
+        // Normalize Z when Auto‑Z is off
+        if (!autoTuneEl?.checked) {
+          const zRaw = parseFloat(zThreshEl.value);
+          if (!Number.isFinite(zRaw)) zThreshEl.value = '7';
+        }
         if (!file) { alert('Pick a file first.'); return; }
         statusEl.textContent = 'Analyzing…';
         const z  = +zThreshEl.value;
@@ -583,6 +709,16 @@
         lastNames       = chanNames.slice();
         lastMeta        = { ...meta };
 
+        // Enable/disable fusion controls based on channel count
+        const fusionAllowed = chanNames.length > 1;
+        if (useFusionEl) {
+          useFusionEl.disabled = !fusionAllowed;
+          if (!fusionAllowed) useFusionEl.checked = false;
+        }
+        if (kVotesEl) {
+          kVotesEl.disabled = !fusionAllowed;
+        }
+
         const zInfo = (typeof meta.z === 'string') ? meta.z : meta.z.toString();
 
         tbody.innerHTML = '';
@@ -627,9 +763,12 @@
 
         // Status & card visibility
         const any = rows.length > 0;
-        statusEl.textContent = any
-          ? `Fused segments: ${fusedSegs.length} • Per-channel segments: ${perChanSegs.reduce((a,s)=>a+s.length,0)}`
-          : 'No segments found at current settings. Try lower z (or Sensitive auto‑mode) or reduce min duration.';
+        if (any) {
+          const fusionNote = (chanNames.length <= 1 && meta.useFusion) ? ' • Fusion auto-disabled (need ≥2 channels)' : '';
+          statusEl.textContent = `Fused segments: ${fusedSegs.length} • Per-channel segments: ${perChanSegs.reduce((a,s)=>a+s.length,0)}${fusionNote}`;
+        } else {
+          statusEl.textContent = 'No segments found at current settings. Try lower z (or Sensitive auto‑mode) or reduce min duration.';
+        }
         resultCard.classList.toggle('hidden', !any);
         downloadBtn.style.display = any ? 'inline-block' : 'none';
 
@@ -638,12 +777,13 @@
       }
 
       function setSuggestedK(nCh) {
-        // If user hasn't touched K, nudge to ceil(20% of channels) with a floor of 2
-        const current = +kVotesEl.value;
+        // If tuning was applied for the currently loaded file, do not override
+        if (tuningAppliedFor && file && basenameOnly(file.name) === tuningAppliedFor) return;
         const suggested = Math.max(2, Math.ceil(nCh * 0.20));
-        // Only auto-adjust if K > nCh or K < 1 or K == 2 and channels changed a lot
-        if (current < 1 || current > nCh || current === 2) {
-          kVotesEl.value = Math.min(suggested, nCh);
+        const clamped = Math.max(1, Math.min(suggested, nCh));
+        const current = +kVotesEl.value;
+        if (!Number.isFinite(current) || current < 1 || current > nCh || current === 2) {
+          kVotesEl.value = clamped;
         }
       }
 
